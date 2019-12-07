@@ -18,6 +18,8 @@
 
 #include "buffer/replacer.h"
 #include "common/config.h"
+#include <mutex>
+
 
 namespace bustub {
 
@@ -47,6 +49,9 @@ class ClockReplacer : public Replacer {
 
  private:
   // TODO(student): implement me!
+  int cur_ptr_;     // clock指针
+  int num_pages_;   // 页数
+  std::vector<std::pair<frame_id_t, int>> clock_set_;
 };
 
 }  // namespace bustub

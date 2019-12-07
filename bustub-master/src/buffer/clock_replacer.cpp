@@ -14,16 +14,48 @@
 
 namespace bustub {
 
-ClockReplacer::ClockReplacer(size_t num_pages) {}
+ClockReplacer::ClockReplacer(size_t num_pages) {
+    cur_ptr_ = 0;
+    num_pages_ = num_pages;
+}
 
 ClockReplacer::~ClockReplacer() = default;
 
-bool ClockReplacer::Victim(frame_id_t *frame_id) { return false; }
+bool ClockReplacer::Victim(frame_id_t *frame_id) {
+    while (true) {
+        if (clock_set_[cur_ptr_].second == 0) {
+            clock_set_.erase((clock_set_.begin() + cur_ptr_));
+            return true;
+        }
+        else
+            clock_set_[cur_ptr_].second = 0;
+        cur_ptr_ = (cur_ptr_ + 1) % clock_set_.size();
+    }
+    return false;
+}
 
-void ClockReplacer::Pin(frame_id_t frame_id) {}
+void ClockReplacer::Pin(frame_id_t frame_id) {
+    for (unsigned long i = 0; i < clock_set_.size(); i++) {
+        if (clock_set_[i].first == frame_id) {
+            clock_set_.erase(clock_set_.begin() + i);
+            cur_ptr_ = i;
+            return;
+        }
+    }
+}
 
-void ClockReplacer::Unpin(frame_id_t frame_id) {}
+void ClockReplacer::Unpin(frame_id_t frame_id) {
+    for (unsigned long i = 0; i < clock_set_.size(); i++) {
+        if (clock_set_[i].first == frame_id) {
+            clock_set_[i].second = 1;
+            return;
+        }
+    }
+    clock_set_.push_back({frame_id, 1});
+}
 
-size_t ClockReplacer::Size() { return 0; }
+size_t ClockReplacer::Size() {
+    return clock_set_.size();
+}
 
 }  // namespace bustub
