@@ -22,9 +22,14 @@ ClockReplacer::ClockReplacer(size_t num_pages) {
 ClockReplacer::~ClockReplacer() = default;
 
 bool ClockReplacer::Victim(frame_id_t *frame_id) {
+    if (Size() == 0)
+        return false;
+
     while (true) {
         if (clock_set_[cur_ptr_].second == 0) {
+            *frame_id = clock_set_[cur_ptr_].first;
             clock_set_.erase((clock_set_.begin() + cur_ptr_));
+
             return true;
         }
         else
