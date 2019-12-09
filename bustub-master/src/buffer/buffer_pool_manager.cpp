@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "buffer/buffer_pool_manager.h"
-
+#include "common/logger.h"
 #include <list>
 #include <unordered_map>
 
@@ -45,8 +45,10 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   std::lock_guard<std::mutex> lock(latch_);
 
   // 如果页表中存在该页
-  if (page_table_.count(page_id)) {
-      return pages_ + page_table_[page_id];
+  if (page_table_.find(page_id) != page_table_.end()) {
+      frame_id_t frame_id = page_table_[page_id];
+      pages_[frame_id].pin_count_++;
+      return pages_ + frame_id;
   }
   else {
       frame_id_t frame = -1;
@@ -66,12 +68,12 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
           if (iter->second == frame) {
               old_page_id = iter->first;
               page_table_.erase(iter);
-              page_table_[page_id] = frame;
               break;
           }
       }
+      page_table_[page_id] = frame;
       // 将脏页写回硬盘
-      if (pages_[frame].is_dirty_) {
+      if (old_page_id != -1 && pages_[frame].is_dirty_) {
           disk_manager_->WritePage(old_page_id, pages_[frame].data_);
       }
 
@@ -81,6 +83,7 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
       pages_[frame].pin_count_ = 1;
       // 从硬盘读取信息到内存页
       disk_manager_->ReadPage(page_id, pages_[frame].data_);
+      return pages_ + frame;
   }
 
   return nullptr;
@@ -147,11 +150,11 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
       if (iter->second == frame) {
             old_page_id = iter->first;
             page_table_.erase(iter);
-            page_table_[*page_id] = frame;
             break;
-        }
+      }
   }
-  if (pages_[frame].is_dirty_) {
+  page_table_[*page_id] = frame;
+  if (old_page_id != -1 && pages_[frame].is_dirty_) {
       disk_manager_->WritePage(old_page_id, pages_[frame].data_);
   }
 
