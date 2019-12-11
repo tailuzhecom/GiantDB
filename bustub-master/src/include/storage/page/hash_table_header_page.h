@@ -93,7 +93,7 @@ class HashTableHeaderPage {
   __attribute__((unused)) lsn_t lsn_;
   __attribute__((unused)) size_t size_;
   __attribute__((unused)) page_id_t page_id_;
-  __attribute__((unused)) size_t next_ind_;
+  __attribute__((unused)) size_t next_ind_ = 0;
   __attribute__((unused)) page_id_t block_page_ids_[0];
 };
 

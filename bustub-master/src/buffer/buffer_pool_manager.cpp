@@ -52,7 +52,6 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
   }
   else {
       frame_id_t frame = -1;
-      // 查看free_list是否有可以用页
       if (!free_list_.empty()) {
           frame = free_list_.front();
           free_list_.pop_front();
