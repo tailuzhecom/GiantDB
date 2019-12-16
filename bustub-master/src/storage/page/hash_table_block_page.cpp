@@ -29,6 +29,7 @@ template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_BLOCK_TYPE::Insert(slot_offset_t bucket_ind, const KeyType &key, const ValueType &value) {
     if (occupied_[bucket_ind])
         return false;
+
     array_[bucket_ind].first = key;
     array_[bucket_ind].second = value;
     occupied_[bucket_ind] = true;
