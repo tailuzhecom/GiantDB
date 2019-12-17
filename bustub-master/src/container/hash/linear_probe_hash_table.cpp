@@ -91,6 +91,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
   auto bucket_page = reinterpret_cast<HashTableBlockPage<KeyType, ValueType, KeyComparator>*>(buffer_pool_manager_->FetchPage(bucket_page_id)->GetData());
 
   bool is_duplicated = false;
+  bool header_page_modified = false;
   // get the slot to insert
   while (bucket_page->IsReadable(slot_idx)) {
       // not allow duplicated item in hash table
@@ -102,11 +103,19 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
       slot_idx++;
       // to the end of current page, get next page
       if (slot_idx * item_size > 4096) {
+
           buffer_pool_manager_->UnpinPage(bucket_page_id, false);
           bucket_id++;
           // current page is the last page in this hash table, return false
-          if ((size_t )bucket_id >= header_page->GetSize())
-              return false;
+          if ((size_t )bucket_id >= header_page->GetSize()) {
+              if (bucket_id >= 4800) {
+                  buffer_pool_manager_->UnpinPage(header_page_id_, header_page_modified);
+                  return false;
+              }
+              else {
+                  Resize(size_);
+              }
+          }
           bucket_page_id = header_page->GetBlockPageId(bucket_id);
           bucket_page = reinterpret_cast<HashTableBlockPage<KeyType, ValueType, KeyComparator>*>(buffer_pool_manager_->FetchPage(bucket_page_id)->GetData());
           slot_idx = 0;
@@ -115,13 +124,13 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
   if (is_duplicated) {
       buffer_pool_manager_->UnpinPage(bucket_id, false);
-      buffer_pool_manager_->UnpinPage(header_page_id_, false);
+      buffer_pool_manager_->UnpinPage(header_page_id_, header_page_modified);
       return false;
   }
   else {
       bucket_page->Insert(slot_idx, key, value);
       buffer_pool_manager_->UnpinPage(bucket_id, true);
-      buffer_pool_manager_->UnpinPage(header_page_id_, false);
+      buffer_pool_manager_->UnpinPage(header_page_id_, header_page_modified);
   }
   return true;
 }
@@ -174,7 +183,19 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::Resize(size_t initial_size) {
-    size_ = initial_size;
+    size_ *= 2;
+    int new_page_id;
+    auto header_page = reinterpret_cast<HashTableHeaderPage*>(buffer_pool_manager_->FetchPage(header_page_id_)->GetData());
+    int i;
+    for (i = initial_size; i < (int)size_; i++) {
+        if (buffer_pool_manager_->NewPage(&new_page_id)) {
+            header_page->AddBlockPageId(new_page_id);
+        }
+        else
+            break;
+    }
+    buffer_pool_manager_->UnpinPage(header_page_id_, true);
+    size_ = i;
 }
 
 /*****************************************************************************
