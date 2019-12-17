@@ -98,6 +98,22 @@ TEST(HashTableTest, SampleTest) {
       EXPECT_TRUE(ht.Remove(nullptr, i, 2 * i));
     }
   }
+
+  // my test
+  // insert 120 keys into hash table
+  for (int i = 0; i < 120; i++) {
+    EXPECT_EQ(true, ht.Insert(nullptr, i, i));
+    std::vector<int> values;
+    ht.GetValue(nullptr, i, &values);
+    EXPECT_EQ(1, values.size()) << "Failed to insert " << i << std::endl;
+    EXPECT_EQ(i, values[0]);
+  }
+
+  // delete all values
+  for (int i = 0; i < 120; i++) {
+      EXPECT_TRUE(ht.Remove(nullptr, i, i));
+  }
+
   disk_manager->ShutDown();
   remove("test.db");
   delete disk_manager;

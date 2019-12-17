@@ -100,6 +100,7 @@ class LinearProbeHashTable : public HashTable<KeyType, ValueType, KeyComparator>
 
   // HashTableHeaderPage *header_page_;
   size_t size_;
+  int slot_num_per_page_;
 };
 
 }  // namespace bustub

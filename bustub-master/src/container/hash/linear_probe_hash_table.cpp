@@ -29,9 +29,11 @@ HASH_TABLE_TYPE::LinearProbeHashTable(const std::string &name, BufferPoolManager
     : buffer_pool_manager_(buffer_pool_manager), comparator_(comparator), hash_fn_(std::move(hash_fn)) {
         auto header_page_ = reinterpret_cast<HashTableHeaderPage*>(buffer_pool_manager_->NewPage(&header_page_id_));
         page_id_t hash_table_first_bucket;
-        buffer_pool_manager->NewPage(&hash_table_first_bucket);
+        auto block_page = reinterpret_cast<HashTableBlockPage<KeyType, ValueType, KeyComparator>*>(buffer_pool_manager->NewPage(&hash_table_first_bucket));
+        slot_num_per_page_ = block_page->SlotNum();
         header_page_->AddBlockPageId(hash_table_first_bucket);
-        size_ = num_buckets;
+        size_ = 1;
+        Resize(num_buckets);
     }
 
 /*****************************************************************************
@@ -40,9 +42,8 @@ HASH_TABLE_TYPE::LinearProbeHashTable(const std::string &name, BufferPoolManager
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std::vector<ValueType> *result) {
     int64_t hash_val = hash_fn_.GetHash(key) % size_;   // get hash value
-    int item_size = sizeof(KeyType) + sizeof(ValueType);
-    page_id_t bucket_id = hash_val * item_size / 4096;  // get page id
-    int slot_idx = (hash_val * item_size % 4096) / item_size;   // get slot_idx'th slot in the page
+    page_id_t bucket_id = hash_val / slot_num_per_page_;  // get page id
+    int slot_idx = hash_val % slot_num_per_page_;   // get slot_idx'th slot in the page
     // get header page
     auto header_page = reinterpret_cast<HashTableHeaderPage*>(buffer_pool_manager_->FetchPage(header_page_id_)->GetData());
     auto bucket_page_id = header_page->GetBlockPageId(bucket_id);
@@ -57,7 +58,7 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
 
         slot_idx++;
         // to the end of current page, get next page
-        if (slot_idx * item_size > 4096) {
+        if (slot_idx >= slot_num_per_page_) {
             buffer_pool_manager_->UnpinPage(bucket_page_id, false);
             bucket_id++;
             // current page is the last page in this hash table, return false
@@ -80,10 +81,10 @@ bool HASH_TABLE_TYPE::GetValue(Transaction *transaction, const KeyType &key, std
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const ValueType &value) {
-  int64_t hash_val = hash_fn_.GetHash(key) % size_;   // get hash value
-  int item_size = sizeof(KeyType) + sizeof(ValueType);
-  page_id_t bucket_id = hash_val * item_size / 4096;  // get page id
-  int slot_idx = (hash_val * item_size % 4096) / item_size;   // get slot_idx'th slot in the page
+    int64_t hash_val = hash_fn_.GetHash(key) % size_;   // get hash value
+    page_id_t bucket_id = hash_val / slot_num_per_page_;  // get page id
+    int slot_idx = hash_val % slot_num_per_page_;   // get slot_idx'th slot in the page
+
   // get header page
   auto header_page = reinterpret_cast<HashTableHeaderPage*>(buffer_pool_manager_->FetchPage(header_page_id_)->GetData());
   auto bucket_page_id = header_page->GetBlockPageId(bucket_id);
@@ -102,13 +103,12 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
       slot_idx++;
       // to the end of current page, get next page
-      if (slot_idx * item_size > 4096) {
-
+      if (slot_idx >= slot_num_per_page_) {
           buffer_pool_manager_->UnpinPage(bucket_page_id, false);
           bucket_id++;
           // current page is the last page in this hash table, return false
           if ((size_t )bucket_id >= header_page->GetSize()) {
-              if (bucket_id >= 4800) {
+              if (bucket_id >= 4080) {
                   buffer_pool_manager_->UnpinPage(header_page_id_, header_page_modified);
                   return false;
               }
@@ -128,11 +128,13 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
       return false;
   }
   else {
-      bucket_page->Insert(slot_idx, key, value);
+      bool ret = false;
+      ret = bucket_page->Insert(slot_idx, key, value);
       buffer_pool_manager_->UnpinPage(bucket_id, true);
       buffer_pool_manager_->UnpinPage(header_page_id_, header_page_modified);
+      return ret;
   }
-  return true;
+
 }
 
 /*****************************************************************************
@@ -141,9 +143,9 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 template <typename KeyType, typename ValueType, typename KeyComparator>
 bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const ValueType &value) {
     int64_t hash_val = hash_fn_.GetHash(key) % size_;   // get hash value
-    int item_size = sizeof(KeyType) + sizeof(ValueType);
-    page_id_t bucket_id = hash_val * item_size / 4096;  // get page id
-    int slot_idx = (hash_val * item_size % 4096) / item_size;   // get slot_idx'th slot in the page
+    page_id_t bucket_id = hash_val / slot_num_per_page_;  // get page id
+    int slot_idx = hash_val % slot_num_per_page_;   // get slot_idx'th slot in the page
+
     // get header page
     auto header_page = reinterpret_cast<HashTableHeaderPage*>(buffer_pool_manager_->FetchPage(header_page_id_)->GetData());
     auto bucket_page_id = header_page->GetBlockPageId(bucket_id);
@@ -159,7 +161,7 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
 
         slot_idx++;
         // to the end of current page, get next page
-        if (slot_idx * item_size > 4096) {
+        if (slot_idx >= slot_num_per_page_) {
             buffer_pool_manager_->UnpinPage(bucket_page_id, false);
             bucket_id++;
             // current page is the last page in this hash table, return false
@@ -183,19 +185,24 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::Resize(size_t initial_size) {
-    size_ *= 2;
+    int new_page_num = initial_size / slot_num_per_page_;
+    if (initial_size % slot_num_per_page_ != 0)
+        new_page_num++;
+
     int new_page_id;
     auto header_page = reinterpret_cast<HashTableHeaderPage*>(buffer_pool_manager_->FetchPage(header_page_id_)->GetData());
     int i;
-    for (i = initial_size; i < (int)size_; i++) {
+    for (i = 0; i < (int)new_page_num; i++) {
         if (buffer_pool_manager_->NewPage(&new_page_id)) {
             header_page->AddBlockPageId(new_page_id);
         }
-        else
+        else{
+            LOG_INFO("page out of usage\n");
             break;
+        }
     }
     buffer_pool_manager_->UnpinPage(header_page_id_, true);
-    size_ = i;
+    size_ += slot_num_per_page_ * i;
 }
 
 /*****************************************************************************

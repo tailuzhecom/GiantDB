@@ -93,6 +93,8 @@ class HashTableBlockPage {
    */
   bool IsReadable(slot_offset_t bucket_ind) const;
 
+  int SlotNum();
+
  private:
   std::atomic_char occupied_[(BLOCK_ARRAY_SIZE - 1) / 8 + 1];
 
