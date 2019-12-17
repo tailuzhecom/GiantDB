@@ -113,7 +113,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
                   return false;
               }
               else {
-                  Resize(size_);
+                  Resize(size_ * 2);
               }
           }
           bucket_page_id = header_page->GetBlockPageId(bucket_id);
