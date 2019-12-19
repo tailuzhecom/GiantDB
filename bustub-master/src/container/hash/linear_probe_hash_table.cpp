@@ -21,7 +21,7 @@
 #include "container/hash/linear_probe_hash_table.h"
 
 namespace bustub {
-
+// TODO concurrency control
 template <typename KeyType, typename ValueType, typename KeyComparator>
 HASH_TABLE_TYPE::LinearProbeHashTable(const std::string &name, BufferPoolManager *buffer_pool_manager,
                                       const KeyComparator &comparator, size_t num_buckets,
@@ -103,7 +103,7 @@ bool HASH_TABLE_TYPE::Insert(Transaction *transaction, const KeyType &key, const
 
       slot_idx++;
       // to the end of current page, get next page
-      if (slot_idx >= slot_num_per_page_) {
+      if (slot_idx >= slot_num_per_page_ || (bucket_id * slot_num_per_page_ + slot_idx >= (int)size_)) {
           buffer_pool_manager_->UnpinPage(bucket_page_id, false);
           bucket_id++;
           // current page is the last page in this hash table, return false
@@ -202,7 +202,7 @@ void HASH_TABLE_TYPE::Resize(size_t initial_size) {
         }
     }
     buffer_pool_manager_->UnpinPage(header_page_id_, true);
-    size_ += slot_num_per_page_ * i;
+    size_ = initial_size;
 }
 
 /*****************************************************************************
