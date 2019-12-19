@@ -32,7 +32,7 @@ HASH_TABLE_TYPE::LinearProbeHashTable(const std::string &name, BufferPoolManager
         auto block_page = reinterpret_cast<HashTableBlockPage<KeyType, ValueType, KeyComparator>*>(buffer_pool_manager->NewPage(&hash_table_first_bucket));
         slot_num_per_page_ = block_page->SlotNum();
         header_page_->AddBlockPageId(hash_table_first_bucket);
-        size_ = 1;
+        size_ = slot_num_per_page_;
         Resize(num_buckets);
     }
 
@@ -185,14 +185,15 @@ bool HASH_TABLE_TYPE::Remove(Transaction *transaction, const KeyType &key, const
  *****************************************************************************/
 template <typename KeyType, typename ValueType, typename KeyComparator>
 void HASH_TABLE_TYPE::Resize(size_t initial_size) {
-    int new_page_num = initial_size / slot_num_per_page_;
+    int new_page_num = initial_size / slot_num_per_page_;  //　一共需要new_page_num个page
     if (initial_size % slot_num_per_page_ != 0)
         new_page_num++;
 
     int new_page_id;
     auto header_page = reinterpret_cast<HashTableHeaderPage*>(buffer_pool_manager_->FetchPage(header_page_id_)->GetData());
     int i;
-    for (i = 0; i < (int)new_page_num; i++) {
+    // LOG_INFO("new pages\n");
+    for (i = header_page->GetSize(); i < (int)new_page_num; i++) {
         if (buffer_pool_manager_->NewPage(&new_page_id)) {
             header_page->AddBlockPageId(new_page_id);
         }
@@ -201,6 +202,27 @@ void HASH_TABLE_TYPE::Resize(size_t initial_size) {
             break;
         }
     }
+
+    // LOG_INFO("rehash\n");
+    int old_size = size_;
+    size_ = initial_size; // 更新size
+    for (i = 0; i < (int)old_size; i++) {
+        int old_page_idx = i / slot_num_per_page_;  // 对应page在header page中的idx
+        int old_slot_idx = i % slot_num_per_page_;
+        int old_page_id =  header_page->GetBlockPageId(old_page_idx); // 对应page的page_id_t
+        // 对应的block_page
+        auto block_page = reinterpret_cast<HashTableBlockPage<KeyType, ValueType, KeyComparator>*>(buffer_pool_manager_->FetchPage(old_page_id));
+
+        if (block_page->IsReadable(old_slot_idx)) {
+            block_page->Remove(old_slot_idx);  // 先删除再插入
+            auto key = block_page->KeyAt(old_slot_idx);
+            auto val = block_page->ValueAt(old_slot_idx);
+            Insert(nullptr, key, val);
+        }
+
+        buffer_pool_manager_->UnpinPage(header_page->GetBlockPageId(old_page_id), true);
+    }
+
     buffer_pool_manager_->UnpinPage(header_page_id_, true);
     size_ = initial_size;
 }

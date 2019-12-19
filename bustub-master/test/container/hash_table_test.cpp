@@ -109,6 +109,16 @@ TEST(HashTableTest, SampleTest) {
     EXPECT_EQ(i, values[0]);
   }
 
+  LOG_INFO("raw test finish.\n");
+  // Resize test
+  ht.Resize(2000);
+  for (int i = 0; i < 120; i++) {
+    std::vector<int> values;
+    EXPECT_EQ(true, ht.GetValue(nullptr, i, &values));
+    EXPECT_EQ(1, values.size()) << "Failed to insert " << i << std::endl;
+    EXPECT_EQ(i, values[0]);
+  }
+
   // delete all values
   for (int i = 0; i < 120; i++) {
       EXPECT_TRUE(ht.Remove(nullptr, i, i));
@@ -119,5 +129,42 @@ TEST(HashTableTest, SampleTest) {
   delete disk_manager;
   delete bpm;
 }
+
+TEST(HashTableTest, ResizeTest) {
+  auto *disk_manager = new DiskManager("test.db");
+  auto *bpm = new BufferPoolManager(50, disk_manager);
+  LinearProbeHashTable<int, int, IntComparator> ht("blah", bpm, IntComparator(), 1000, HashFunction<int>());
+
+  // my test
+  // insert 120 keys into hash table
+  for (int i = 0; i < 500; i++) {
+    EXPECT_EQ(true, ht.Insert(nullptr, i, i));
+    std::vector<int> values;
+    ht.GetValue(nullptr, i, &values);
+    EXPECT_EQ(1, values.size()) << "Failed to insert " << i << std::endl;
+    EXPECT_EQ(i, values[0]);
+  }
+
+  // Resize test
+  ht.Resize(2000);
+  for (int i = 0; i < 500; i++) {
+    std::vector<int> values;
+    EXPECT_EQ(true, ht.GetValue(nullptr, i, &values));
+    EXPECT_EQ(1, values.size()) << "Failed to insert " << i << std::endl;
+    EXPECT_EQ(i, values[0]);
+  }
+
+  // delete all values
+  for (int i = 0; i < 500; i++) {
+    EXPECT_TRUE(ht.Remove(nullptr, i, i));
+  }
+
+  disk_manager->ShutDown();
+  remove("test.db");
+  delete disk_manager;
+  delete bpm;
+
+}
+
 
 }  // namespace bustub
