@@ -167,4 +167,47 @@ TEST(HashTableTest, ResizeTest) {
 }
 
 
+std::mutex ht_mtx;
+void ConcurrencyThreadFunc(LinearProbeHashTable<int, int, IntComparator> *ht, int n) {
+
+    for (int i = 0; i < 50; i++) {
+        int key = i + n;
+        std::unique_lock<std::mutex> lck(ht_mtx);
+        EXPECT_EQ(true, ht->Insert(nullptr, key, i));
+        std::vector<int> values;
+        ht->GetValue(nullptr, key, &values);
+        EXPECT_EQ(1, values.size()) << "Insert phase Failed to insert " << key << std::endl;
+        EXPECT_EQ(i, values[0]);
+    }
+
+    for (int i = 0; i < 50; i++) {
+        int key = i + n;
+        std::unique_lock<std::mutex> lck(ht_mtx);
+        std::vector<int> values;
+        EXPECT_EQ(true, ht->GetValue(nullptr, key, &values));
+        EXPECT_EQ(1, values.size()) << "GetValue phase Failed to insert " << key << std::endl;
+        EXPECT_EQ(i, values[0]);
+    }
+}
+
+
+TEST(HashTableTest, ConcurrencyTest) {
+  auto *disk_manager = new DiskManager("test.db");
+  auto *bpm = new BufferPoolManager(50, disk_manager);
+  LinearProbeHashTable<int, int, IntComparator> ht("blah", bpm, IntComparator(), 1000, HashFunction<int>());
+
+  // write multithread code here
+  std::thread t1(ConcurrencyThreadFunc, &ht, 0);
+  std::thread t2(ConcurrencyThreadFunc, &ht, 105);
+  std::thread t3(ConcurrencyThreadFunc, &ht, 300);
+  t1.join();
+  t2.join();
+  t3.join();
+
+  disk_manager->ShutDown();
+  remove("test.db");
+  delete disk_manager;
+  delete bpm;
+}
+
 }  // namespace bustub

@@ -15,6 +15,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <thread>
 
 #include "buffer/buffer_pool_manager.h"
 #include "concurrency/transaction.h"
@@ -101,6 +102,8 @@ class LinearProbeHashTable : public HashTable<KeyType, ValueType, KeyComparator>
   // HashTableHeaderPage *header_page_;
   size_t size_;
   int slot_num_per_page_;
+  bool is_resizing_ = false;
+  std::thread::id resize_thread_id_;
 };
 
 }  // namespace bustub

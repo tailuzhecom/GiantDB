@@ -39,10 +39,12 @@ class ReaderWriterLatch {
    */
   void WLock() {
     std::unique_lock<mutex_t> latch(mutex_);
+    // 等待另外一个写进程结束
     while (writer_entered_) {
       reader_.wait(latch);
     }
     writer_entered_ = true;
+    // 等待所有的读进程结束
     while (reader_count_ > 0) {
       writer_.wait(latch);
     }
@@ -54,6 +56,7 @@ class ReaderWriterLatch {
   void WUnlock() {
     std::lock_guard<mutex_t> guard(mutex_);
     writer_entered_ = false;
+    // 通知所有的读进程
     reader_.notify_all();
   }
 
@@ -62,6 +65,7 @@ class ReaderWriterLatch {
    */
   void RLock() {
     std::unique_lock<mutex_t> latch(mutex_);
+    // 如果有写进程或者读进程数量达到上限，进入等待
     while (writer_entered_ || reader_count_ == MAX_READERS) {
       reader_.wait(latch);
     }
@@ -74,12 +78,13 @@ class ReaderWriterLatch {
   void RUnlock() {
     std::lock_guard<mutex_t> guard(mutex_);
     reader_count_--;
+    // 如果有写进程在等待，那么在读进程全部结束后唤醒写进程
     if (writer_entered_) {
       if (reader_count_ == 0) {
         writer_.notify_one();
       }
     } else {
-      if (reader_count_ == MAX_READERS - 1) {
+      if (reader_count_ == MAX_READERS - 1) { // 用于处理读进程达到上限的情况
         reader_.notify_one();
       }
     }
