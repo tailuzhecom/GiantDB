@@ -31,6 +31,7 @@ bool HASH_TABLE_BLOCK_TYPE::Insert(slot_offset_t bucket_ind, const KeyType &key,
 //    LOG_INFO("block page readable size: %ld\n", sizeof(readable_));
 //    LOG_INFO("block page occupied size: %ld\n", sizeof(occupied_));
 //    LOG_INFO("block page array size: %ld\n", sizeof(array_));
+
     int byte_num = bucket_ind / 8;
     int bit_num = bucket_ind % 8;
     unsigned char and_val = (1 << bit_num);

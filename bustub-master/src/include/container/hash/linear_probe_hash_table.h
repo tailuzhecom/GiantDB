@@ -103,6 +103,7 @@ class LinearProbeHashTable : public HashTable<KeyType, ValueType, KeyComparator>
   size_t size_;
   int slot_num_per_page_;
   bool is_resizing_ = false;
+  bool is_inserting_ = false;
   std::thread::id resize_thread_id_;
 };
 
