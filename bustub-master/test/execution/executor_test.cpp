@@ -41,6 +41,7 @@ class ExecutorTest : public ::testing::Test {
   void SetUp() override {
     ::testing::Test::SetUp();
     // For each test, we create a new DiskManager, BufferPoolManager, TransactionManager, and SimpleCatalog.
+    std::cout << "SetUp is running..." << std::endl;
     disk_manager_ = std::make_unique<DiskManager>("executor_test.db");
     bpm_ = std::make_unique<BufferPoolManager>(32, disk_manager_.get());
     txn_mgr_ = std::make_unique<TransactionManager>(lock_manager_.get(), log_manager_.get());
@@ -58,7 +59,7 @@ class ExecutorTest : public ::testing::Test {
     // Commit our transaction.
     txn_mgr_->Commit(txn_);
     // Shut down the disk manager and clean up the transaction.
-    disk_manager_->ShutDown();
+    // disk_manager_->ShutDown();
     remove("executor_test.db");
     delete txn_;
   };
@@ -122,7 +123,8 @@ class ExecutorTest : public ::testing::Test {
 };
 
 // NOLINTNEXTLINE
-TEST_F(ExecutorTest, DISABLED_SimpleSeqScanTest) {
+TEST_F(ExecutorTest, impleSeqScanTest) {
+  std::cout << "impleSeqScanTest begin..." << std::endl;
   // SELECT colA, colB FROM test_1 WHERE colA < 500
   TableMetadata *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
   Schema &schema = table_info->schema_;
@@ -132,17 +134,23 @@ TEST_F(ExecutorTest, DISABLED_SimpleSeqScanTest) {
   auto *predicate = MakeComparisonExpression(colA, const500, ComparisonType::LessThan);
   auto *out_schema = MakeOutputSchema({{"colA", colA}, {"colB", colB}});
 
+  
   SeqScanPlanNode plan{out_schema, predicate, table_info->oid_};
+  std::cout << "begin CreateExecutor()" << std::endl;
   auto executor = ExecutorFactory::CreateExecutor(GetExecutorContext(), &plan);
+  std::cout << "end CreateExecutor()" << std::endl;
+  std::cout << "begin Init()" << std::endl;
   executor->Init();
+  std::cout << "end Init()" << std::endl;
   Tuple tuple;
   uint32_t num_tuples = 0;
-  std::cout << "ColA, ColB" << std::endl;
+  std::cout << "begin Next()" << std::endl;
   while (executor->Next(&tuple)) {
-    ASSERT_TRUE(tuple.GetValue(out_schema, out_schema->GetColIdx("colA")).GetAs<int32_t>() < 500);
-    ASSERT_TRUE(tuple.GetValue(out_schema, out_schema->GetColIdx("colB")).GetAs<int32_t>() < 10);
     std::cout << tuple.GetValue(out_schema, out_schema->GetColIdx("colA")).GetAs<int32_t>() << ", "
               << tuple.GetValue(out_schema, out_schema->GetColIdx("colB")).GetAs<int32_t>() << std::endl;
+    ASSERT_TRUE(tuple.GetValue(out_schema, out_schema->GetColIdx("colA")).GetAs<int32_t>() < 500);
+    ASSERT_TRUE(tuple.GetValue(out_schema, out_schema->GetColIdx("colB")).GetAs<int32_t>() < 10);
+    
     num_tuples++;
   }
   ASSERT_EQ(num_tuples, 500);

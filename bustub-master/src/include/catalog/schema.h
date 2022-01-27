@@ -21,6 +21,7 @@
 
 namespace bustub {
 
+// Schema主要的功能是维护Column数组
 class Schema {
  public:
   /**

@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <exception>
 
 #include "buffer/buffer_pool_manager.h"
 #include "catalog/schema.h"
@@ -54,14 +55,28 @@ class SimpleCatalog {
    */
   TableMetadata *CreateTable(Transaction *txn, const std::string &table_name, const Schema &schema) {
     BUSTUB_ASSERT(names_.count(table_name) == 0, "Table names should be unique!");
-    return nullptr;
+    table_oid_t cur_table_oid = next_table_oid_++;
+    names_[table_name] = cur_table_oid;
+    tables_[cur_table_oid] = std::make_unique<TableMetadata>(schema, table_name, 
+                                std::make_unique<bustub::TableHeap>(bpm_, lock_manager_, log_manager_, txn), cur_table_oid);
+    return tables_[cur_table_oid].get();
   }
 
-  /** @return table metadata by name */
-  TableMetadata *GetTable(const std::string &table_name) { return nullptr; }
+  /** @return table metadata by name */       
+  TableMetadata *GetTable(const std::string &table_name) { 
+    if (names_.count(table_name) == 0)
+      throw std::out_of_range("");
+
+    return tables_[names_[table_name]].get();
+  }
 
   /** @return table metadata by oid */
-  TableMetadata *GetTable(table_oid_t table_oid) { return nullptr; }
+  TableMetadata *GetTable(table_oid_t table_oid) {
+    if (tables_.count(table_oid) == 0)
+      throw std::out_of_range("");
+    
+    return tables_[table_oid].get();
+  }
 
  private:
   [[maybe_unused]] BufferPoolManager *bpm_;

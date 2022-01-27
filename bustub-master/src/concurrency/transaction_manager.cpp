@@ -37,9 +37,9 @@ Transaction *TransactionManager::Begin(Transaction *txn) {
   return txn;
 }
 
+// TODO: executor debug
 void TransactionManager::Commit(Transaction *txn) {
   txn->SetState(TransactionState::COMMITTED);
-
   // Perform all deletes before we commit.
   auto write_set = txn->GetWriteSet();
   while (!write_set->empty()) {

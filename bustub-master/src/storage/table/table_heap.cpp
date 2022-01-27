@@ -37,11 +37,14 @@ TableHeap::TableHeap(BufferPoolManager *buffer_pool_manager, LockManager *lock_m
 }
 
 bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn) {
+  // LOG_INFO("InsertTuple");
+  // LOG_INFO("tuple.size: %d", tuple.size_);
   if (tuple.size_ + 32 > PAGE_SIZE) {  // larger than one page size
     txn->SetState(TransactionState::ABORTED);
     return false;
   }
 
+  // LOG_INFO("FetchPage");
   auto cur_page = static_cast<TablePage *>(buffer_pool_manager_->FetchPage(first_page_id_));
   if (cur_page == nullptr) {
     txn->SetState(TransactionState::ABORTED);
@@ -51,6 +54,7 @@ bool TableHeap::InsertTuple(const Tuple &tuple, RID *rid, Transaction *txn) {
   cur_page->WLatch();
   // Insert into the first page with enough space. If no such page exists, create a new page and insert into that.
   // INVARIANT: cur_page is WLatched if you leave the loop normally.
+  // LOG_INFO("cur_page->InsertTuple");
   while (!cur_page->InsertTuple(tuple, rid, txn, lock_manager_, log_manager_)) {
     auto next_page_id = cur_page->GetNextPageId();
     // If the next page is a valid page,
@@ -181,6 +185,8 @@ TableIterator TableHeap::Begin(Transaction *txn) {
   return TableIterator(this, rid, txn);
 }
 
-TableIterator TableHeap::End() { return TableIterator(this, RID(INVALID_PAGE_ID, 0), nullptr); }
+TableIterator TableHeap::End() { 
+  return TableIterator(this, RID(INVALID_PAGE_ID, 0), nullptr);
+}
 
 }  // namespace bustub

@@ -50,6 +50,7 @@ void TableGenerator::FillTable(TableMetadata *info, TableInsertMeta *table_meta)
   uint32_t batch_size = 128;
   while (num_inserted < table_meta->num_rows_) {
     std::vector<std::vector<Value>> values;
+    // 每次最多写入batch_size个item
     uint32_t num_values = std::min(batch_size, table_meta->num_rows_ - num_inserted);
     for (auto &col_meta : table_meta->col_meta_) {
       values.emplace_back(MakeValues(&col_meta, num_values));
@@ -76,6 +77,7 @@ void TableGenerator::GenerateTestTables() {
    * with a name, size, and schema. We also configure the columns of the table. If
    * you add a new table, set it up here.
    */
+  // 设置要创建的表的属性
   std::vector<TableInsertMeta> insert_meta{
       // The empty table
       {"empty_table", 0, {{"colA", TypeId::INTEGER, false, Dist::Serial, 0, 0}}},
@@ -107,10 +109,13 @@ void TableGenerator::GenerateTestTables() {
        {{"outA", TypeId::INTEGER, false, Dist::Serial, 0, 0}, {"outB", TypeId::INTEGER, false, Dist::Uniform, 0, 9}}},
   };
 
+  // 获取每个表的meta信息
   for (auto &table_meta : insert_meta) {
     // Create Schema
     std::vector<Column> cols{};
+
     cols.reserve(table_meta.col_meta_.size());
+    // 获取表中每个属性的meta信息
     for (const auto &col_meta : table_meta.col_meta_) {
       if (col_meta.type_ != TypeId::VARCHAR) {
         cols.emplace_back(col_meta.name_, col_meta.type_);
@@ -118,6 +123,7 @@ void TableGenerator::GenerateTestTables() {
         cols.emplace_back(col_meta.name_, col_meta.type_, TEST_VARLEN_SIZE);
       }
     }
+    // 创建表对应的schema
     Schema schema(cols);
     auto info = exec_ctx_->GetCatalog()->CreateTable(exec_ctx_->GetTransaction(), table_meta.name_, schema);
     FillTable(info, &table_meta);
