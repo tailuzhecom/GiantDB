@@ -22,18 +22,24 @@ namespace bustub {
 
 // TODO(Amadou): It does not look like nulls are supported. Add a null bitmap?
 Tuple::Tuple(std::vector<Value> values, const Schema *schema) : allocated_(true) {
+  std::cout << "Tuple construct..." << std::endl;
+  std::cout << "schema: " << schema << std::endl;
+  std::cout << "value size: " << values.size() << " " << "col count: " << schema->GetColumnCount() << std::endl;
   assert(values.size() == schema->GetColumnCount());
 
+  std::cout << "calculate" << std::endl;
   // 1. Calculate the size of the tuple.
   uint32_t tuple_size = schema->GetLength();
   for (auto &i : schema->GetUnlinedColumns()) {
     tuple_size += (values[i].GetLength() + sizeof(uint32_t));
   }
 
+  std::cout << "alloc" << std::endl;
   // 2. Allocate memory.
   size_ = tuple_size;
   data_ = new char[size_];
 
+  std::cout << "serialize" << std::endl;
   // 3. Serialize each attribute based on the input value.
   uint32_t column_count = schema->GetColumnCount();
   uint32_t offset = schema->GetLength();

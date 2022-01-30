@@ -123,7 +123,7 @@ class ExecutorTest : public ::testing::Test {
 };
 
 // NOLINTNEXTLINE
-TEST_F(ExecutorTest, impleSeqScanTest) {
+TEST_F(ExecutorTest, DISABLED_impleSeqScanTest) {
   std::cout << "impleSeqScanTest begin..." << std::endl;
   // SELECT colA, colB FROM test_1 WHERE colA < 500
   TableMetadata *table_info = GetExecutorContext()->GetCatalog()->GetTable("test_1");
@@ -157,9 +157,11 @@ TEST_F(ExecutorTest, impleSeqScanTest) {
 }
 
 // NOLINTNEXTLINE
-TEST_F(ExecutorTest, DISABLED_SimpleRawInsertTest) {
+TEST_F(ExecutorTest, SimpleRawInsertTest) {
   // INSERT INTO empty_table2 VALUES (100, 10), (101, 11), (102, 12)
   // Create Values to insert
+  std::cout << "SimpleRawInsertTest begin..." << std::endl;
+
   std::vector<Value> val1{ValueFactory::GetIntegerValue(100), ValueFactory::GetIntegerValue(10)};
   std::vector<Value> val2{ValueFactory::GetIntegerValue(101), ValueFactory::GetIntegerValue(11)};
   std::vector<Value> val3{ValueFactory::GetIntegerValue(102), ValueFactory::GetIntegerValue(12)};
