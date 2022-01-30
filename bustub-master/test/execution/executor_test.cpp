@@ -157,7 +157,7 @@ TEST_F(ExecutorTest, DISABLED_impleSeqScanTest) {
 }
 
 // NOLINTNEXTLINE
-TEST_F(ExecutorTest, SimpleRawInsertTest) {
+TEST_F(ExecutorTest, DISABLED_SimpleRawInsertTest) {
   // INSERT INTO empty_table2 VALUES (100, 10), (101, 11), (102, 12)
   // Create Values to insert
   std::cout << "SimpleRawInsertTest begin..." << std::endl;
@@ -207,7 +207,7 @@ TEST_F(ExecutorTest, SimpleRawInsertTest) {
 }
 
 // NOLINTNEXTLINE
-TEST_F(ExecutorTest, DISABLED_SimpleSelectInsertTest) {
+TEST_F(ExecutorTest, SimpleSelectInsertTest) {
   // INSERT INTO empty_table2 SELECT colA, colB FROM test_1 WHERE colA < 500
   std::unique_ptr<AbstractPlanNode> scan_plan1;
   const Schema *out_schema1;

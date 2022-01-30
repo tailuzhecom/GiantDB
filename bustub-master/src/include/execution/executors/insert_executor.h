@@ -47,12 +47,24 @@ class InsertExecutor : public AbstractExecutor {
   // Note that Insert does not make use of the tuple pointer being passed in.
   // We return false if the insert failed for any reason, and return true if all inserts succeeded.
   bool Next([[maybe_unused]] Tuple *tuple) override {
-    std::vector<std::vector<Value>> raw_values = plan_->RawValues();
     RID rid;
-    for (unsigned int i = 0; i < raw_values.size(); i++) {
+    if (plan_->IsRawInsert()) {
+      std::vector<std::vector<Value>> raw_values = plan_->RawValues();
+      for (unsigned int i = 0; i < raw_values.size(); i++) {
       if (table_->InsertTuple(Tuple(raw_values[i], &table_meta_->schema_), &rid, exec_ctx_->GetTransaction()) == false) 
         return false;
+      }
     }
+    else {
+      Tuple child_tuple;
+      auto child_executor = ExecutorFactory::CreateExecutor(exec_ctx_, plan_->GetChildPlan());
+      child_executor->Init();
+      while (child_executor->Next(&child_tuple)) {
+        if (table_->InsertTuple(child_tuple, &rid, exec_ctx_->GetTransaction()) == false)
+          return false;
+      }
+    }
+    
     return true; 
   }
 
