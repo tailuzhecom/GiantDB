@@ -97,16 +97,81 @@ class HashJoinExecutor : public AbstractExecutor {
    */
   HashJoinExecutor(ExecutorContext *exec_ctx, const HashJoinPlanNode *plan, std::unique_ptr<AbstractExecutor> &&left,
                    std::unique_ptr<AbstractExecutor> &&right)
-      : AbstractExecutor(exec_ctx) {}
+      : AbstractExecutor(exec_ctx), 
+        plan_(plan),
+        left_executor_(std::move(left)),
+        right_executor_(std::move(right))  {}
 
   /** @return the JHT in use. Do not modify this function, otherwise you will get a zero. */
   // Uncomment me! const HT *GetJHT() const { return &jht_; }
 
   const Schema *GetOutputSchema() override { return plan_->OutputSchema(); }
 
-  void Init() override {}
+  void Init() override {
+    left_executor_->Init();
+    right_executor_->Init();
+    Tuple cur_tuple;
+    left_idx = 0;
+    right_idx = 0;
 
-  bool Next(Tuple *tuple) override { return false; }
+    while (left_executor_->Next(&cur_tuple)) {
+      left_tuples.push_back(cur_tuple);
+    }
+
+    while (right_executor_->Next(&cur_tuple)) {
+      right_tuples.push_back(cur_tuple);
+    }
+
+    left_schema = left_executor_->GetOutputSchema();
+    right_schema = right_executor_->GetOutputSchema();
+    output_schema = plan_->OutputSchema();
+    std::vector<Column> output_cols = output_schema->GetColumns();
+    std::vector<Column> left_cols = left_schema->GetColumns();
+    std::vector<Column> right_cols = right_schema->GetColumns();
+
+    for (unsigned int i = 0; i < output_cols.size(); i++) {
+    for (unsigned int j = 0; j < left_cols.size(); j++) {
+      if (output_cols[i].GetName() == left_cols[j].GetName()) {
+        output_order.push_back({0, j});
+      }
+    }
+
+    for (unsigned int j = 0; j < right_cols.size(); j++) {
+      if (output_cols[i].GetName() == right_cols[j].GetName()) {
+        output_order.push_back({1, j});
+      }
+    }
+    }
+
+    left_tuples_size = left_tuples.size();
+    right_tuples_size = right_tuples.size();
+    total_size = left_tuples_size * right_tuples_size;
+    idx = 0;
+  }
+
+  bool Next(Tuple *tuple) override { 
+    Tuple cur_tuple;
+
+    for (; idx < total_size; idx++) {
+        int left_idx = idx / right_tuples_size;
+        int right_idx = idx % right_tuples_size;
+        if (plan_->Predicate()->EvaluateJoin(&left_tuples[left_idx], left_schema, &right_tuples[right_idx], right_schema).GetAs<bool>()) {
+          std::vector<Value> values;
+
+          for (const auto &order : output_order) {
+            if (order.first == 1)
+              values.push_back(left_tuples[left_idx].GetValue(left_schema, order.second));
+            else 
+              values.push_back(right_tuples[right_idx].GetValue(right_schema, order.second));
+          }
+          *tuple = Tuple(values, output_schema);
+          idx++;
+          
+          return true;
+      }
+    }
+    return false;
+  }
 
   /**
    * Hashes a tuple by evaluating it against every expression on the given schema, combining all non-null hashes.
@@ -142,5 +207,20 @@ class HashJoinExecutor : public AbstractExecutor {
   // Uncomment me! HT jht_;
   /** The number of buckets in the hash table. */
   static constexpr uint32_t jht_num_buckets_ = 2;
+
+  std::vector<Tuple> left_tuples, right_tuples;
+  std::vector<std::pair<int, int> > output_order;
+  int left_tuples_size;
+  int right_tuples_size;
+  int total_size;
+  int left_idx;
+  int right_idx;
+  int idx;
+  const Schema *left_schema;
+  const Schema *right_schema;
+  const Schema *output_schema;
+  std::unique_ptr<AbstractExecutor> left_executor_;
+  std::unique_ptr<AbstractExecutor> right_executor_;
+  
 };
 }  // namespace bustub

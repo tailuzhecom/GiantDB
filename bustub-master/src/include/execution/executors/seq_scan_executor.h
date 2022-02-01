@@ -38,6 +38,7 @@ class SeqScanExecutor : public AbstractExecutor {
 
 
   void Init() override {
+    std::cout << "Init times: " << init_times << std::endl;
     iter_ = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid())->table_->Begin(exec_ctx_->GetTransaction());
     end_iter_ = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid())->table_->End();
     std::cout << "cmp iterator: " << (iter_ == end_iter_)<< std::endl;
@@ -68,5 +69,6 @@ class SeqScanExecutor : public AbstractExecutor {
   const SeqScanPlanNode *plan_;
   TableIterator iter_;
   TableIterator end_iter_;
+  int init_times = 0;
 };
 }  // namespace bustub
