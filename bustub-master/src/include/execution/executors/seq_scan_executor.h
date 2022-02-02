@@ -38,10 +38,8 @@ class SeqScanExecutor : public AbstractExecutor {
 
 
   void Init() override {
-    std::cout << "Init times: " << init_times << std::endl;
     iter_ = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid())->table_->Begin(exec_ctx_->GetTransaction());
     end_iter_ = exec_ctx_->GetCatalog()->GetTable(plan_->GetTableOid())->table_->End();
-    std::cout << "cmp iterator: " << (iter_ == end_iter_)<< std::endl;
   }
 
   bool Next(Tuple *tuple) override { 

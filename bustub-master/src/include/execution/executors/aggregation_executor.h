@@ -178,20 +178,43 @@ class AggregationExecutor : public AbstractExecutor {
 
     Tuple cur_tuple;
     while (child_->Next(&cur_tuple)) {
-      aht_.InsertCombine(MakeKey(&cur_tuple), MakeVal(&cur_tuple));
+      // if (plan_->GetHaving() && plan_->GetHaving()->Evaluate(&cur_tuple, child_->GetOutputSchema()).GetAs<bool>()) {
+        aht_.InsertCombine(MakeKey(&cur_tuple), MakeVal(&cur_tuple));
+      // }
     }
 
     aht_iterator_ = aht_.Begin();
   }
 
   bool Next(Tuple *tuple) override {
-    if (aht_iterator_ != aht_.End())
-      return false;
+    bool ret = false;
+    std::vector<Value> values;
+    const Schema *output_schema = GetOutputSchema();
 
-    *tuple = Tuple(aht_iterator_.Val().aggregates_, GetOutputSchema());
-    ++aht_iterator_;
+    while (aht_iterator_ != aht_.End()) {
+      if (plan_->GetHaving() == nullptr) {
+        ret = true;
+        break;
+      }
+      else {
+        if (plan_->GetHaving()->EvaluateAggregate(aht_iterator_.Key().group_bys_, aht_iterator_.Val().aggregates_).GetAs<bool>()) {
+          ret = true;
+          break;
+        }
+      }
+      
+      ++aht_iterator_;
+    }
 
-    return true;
+    if (ret) {
+      for (unsigned int i = 0; i < output_schema->GetColumnCount(); i++) {
+        values.push_back(output_schema->GetColumn(i).GetExpr()->EvaluateAggregate(aht_iterator_.Key().group_bys_, aht_iterator_.Val().aggregates_));
+      }
+      *tuple = Tuple(values, GetOutputSchema());
+      ++aht_iterator_;
+    }
+    
+    return ret;
   }
 
   /** @return the tuple as an AggregateKey */
