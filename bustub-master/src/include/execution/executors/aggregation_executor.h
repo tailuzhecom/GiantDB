@@ -162,16 +162,64 @@ class AggregationExecutor : public AbstractExecutor {
    */
   AggregationExecutor(ExecutorContext *exec_ctx, const AggregationPlanNode *plan,
                       std::unique_ptr<AbstractExecutor> &&child)
-      : AbstractExecutor(exec_ctx) {}
+      : AbstractExecutor(exec_ctx), 
+        plan_(plan),
+        child_(std::move(child)),
+        has_init(false) {}
 
   /** Do not use or remove this function, otherwise you will get zero points. */
   const AbstractExecutor *GetChildExecutor() const { return child_.get(); }
 
   const Schema *GetOutputSchema() override { return plan_->OutputSchema(); }
 
-  void Init() override {}
+  void Init() override {
+    child_->Init();
+    has_init = true;
+  }
 
-  bool Next(Tuple *tuple) override { return false; }
+  bool Next(Tuple *tuple) override {
+    Tuple cur_tuple;
+    std::vector<AggregationType> types = plan_->GetAggregateTypes();
+    const std::vector<const AbstractExpression*> aggs = plan_->GetAggregates();
+    
+    std::vector<Value> values;
+    for (unsigned int i = 0; i < types.size(); i++) {
+      if (types[i] == AggregationType::CountAggregate)
+        values.push_back(ValueFactory::GetIntegerValue(0));
+      else if (types[i] == AggregationType::MaxAggregate)
+        values.push_back(ValueFactory::GetIntegerValue(BUSTUB_INT32_MIN));
+      else if (types[i] == AggregationType::MinAggregate)
+        values.push_back(ValueFactory::GetIntegerValue(BUSTUB_INT32_MAX));
+      else if (types[i] == AggregationType::SumAggregate)
+        values.push_back(ValueFactory::GetIntegerValue(0));
+    }
+
+    const Schema* child_schema = child_->GetOutputSchema();
+
+    bool is_child_end = true;
+    while (child_->Next(&cur_tuple)) {
+      is_child_end = false;
+      for (unsigned int i = 0; i < types.size(); i++) {
+        if (types[i] == AggregationType::CountAggregate)
+          values[i] = values[i].Add(ValueFactory::GetIntegerValue(1));
+        else if (types[i] == AggregationType::MaxAggregate) {
+          values[i] = values[i].Max(aggs[i]->Evaluate(&cur_tuple, child_schema));
+        }
+          
+        else if (types[i] == AggregationType::MinAggregate)
+          values[i] = values[i].Min(aggs[i]->Evaluate(&cur_tuple, child_schema));
+        else if (types[i] == AggregationType::SumAggregate)
+          values[i] = values[i].Add(aggs[i]->Evaluate(&cur_tuple, child_schema));
+      }
+    }
+
+    if (is_child_end == true)
+      return false;
+
+    *tuple = Tuple(values, GetOutputSchema());     
+    has_init = false;
+    return true;
+  }
 
   /** @return the tuple as an AggregateKey */
   AggregateKey MakeKey(const Tuple *tuple) {
@@ -196,6 +244,7 @@ class AggregationExecutor : public AbstractExecutor {
   const AggregationPlanNode *plan_;
   /** The child executor whose tuples we are aggregating. */
   std::unique_ptr<AbstractExecutor> child_;
+  bool has_init;
   /** Simple aggregation hash table. */
   // Uncomment me! SimpleAggregationHashTable aht_;
   /** Simple aggregation hash table iterator. */
