@@ -73,6 +73,10 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
       page_table_[page_id] = frame;
       // 将脏页写回硬盘
       if (old_page_id != -1 && pages_[frame].is_dirty_) {
+          lsn_t page_lsn = pages_[frame].GetLSN();
+          while (page_lsn < log_manager_->GetPersistentLSN())
+            log_manager_->ForceFlush();
+
           disk_manager_->WritePage(old_page_id, pages_[frame].data_);
       }
 
@@ -114,6 +118,10 @@ bool BufferPoolManager::FlushPageImpl(page_id_t page_id) {
   if (page_table_.find(page_id) != page_table_.end()) {
       frame_id_t frame_id = page_table_[page_id];
       if (pages_[frame_id].is_dirty_) {
+          lsn_t page_lsn = pages_[frame_id].GetLSN();
+          while (page_lsn < log_manager_->GetPersistentLSN())
+            log_manager_->ForceFlush();
+
           disk_manager_->WritePage(page_id, pages_[frame_id].data_);
           pages_[frame_id].is_dirty_ = false;
       }
@@ -154,6 +162,10 @@ Page *BufferPoolManager::NewPageImpl(page_id_t *page_id) {
   }
   page_table_[*page_id] = frame;
   if (old_page_id != -1 && pages_[frame].is_dirty_) {
+      lsn_t page_lsn = pages_[frame].GetLSN();
+      while (page_lsn < log_manager_->GetPersistentLSN())
+        log_manager_->ForceFlush();
+
       disk_manager_->WritePage(old_page_id, pages_[frame].data_);
   }
 
@@ -193,6 +205,10 @@ void BufferPoolManager::FlushAllPagesImpl() {
   std::lock_guard<std::mutex> lock(latch_);
   for (const auto &e : page_table_) {
       if (pages_[e.second].is_dirty_) {
+          lsn_t page_lsn = pages_[e.second].GetLSN();
+          while (page_lsn < log_manager_->GetPersistentLSN())
+            log_manager_->ForceFlush();
+
           disk_manager_->WritePage(e.first, pages_[e.second].data_);
           pages_[e.second].is_dirty_ = false;
       }

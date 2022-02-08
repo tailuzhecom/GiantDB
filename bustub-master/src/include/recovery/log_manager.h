@@ -32,6 +32,7 @@ class LogManager {
       : next_lsn_(0), persistent_lsn_(INVALID_LSN), disk_manager_(disk_manager) {
     log_buffer_ = new char[LOG_BUFFER_SIZE];
     flush_buffer_ = new char[LOG_BUFFER_SIZE];
+    offset_ = 0;
   }
 
   ~LogManager() {
@@ -43,6 +44,9 @@ class LogManager {
 
   void RunFlushThread();
   void StopFlushThread();
+  int SwapBuffer();
+  void WaitForFlushFinish();
+  void ForceFlush();
 
   lsn_t AppendLogRecord(LogRecord *log_record);
 
@@ -58,6 +62,7 @@ class LogManager {
   std::atomic<lsn_t> next_lsn_;
   /** The log records before and including the persistent lsn have been written to disk. */
   std::atomic<lsn_t> persistent_lsn_;
+  int offset_;
 
   char *log_buffer_;
   char *flush_buffer_;
@@ -65,7 +70,7 @@ class LogManager {
   std::mutex latch_;
 
   std::thread *flush_thread_ __attribute__((__unused__));
-
+  std::shared_future<void> flush_future_;
   std::condition_variable cv_;
 
   DiskManager *disk_manager_ __attribute__((__unused__));

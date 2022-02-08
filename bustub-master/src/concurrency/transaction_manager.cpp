@@ -31,13 +31,15 @@ Transaction *TransactionManager::Begin(Transaction *txn) {
 
   if (enable_logging) {
     // TODO(student): Add logging here.
+    LogRecord log_record(txn->GetTransactionId(), txn->GetPrevLSN(), LogRecordType::BEGIN);
+    lsn_t cur_lsn = log_manager_->AppendLogRecord(&log_record);
+    txn->SetPrevLSN(cur_lsn);
   }
 
   txn_map[txn->GetTransactionId()] = txn;
   return txn;
 }
 
-// TODO: executor debug
 void TransactionManager::Commit(Transaction *txn) {
   txn->SetState(TransactionState::COMMITTED);
   // Perform all deletes before we commit.
@@ -55,6 +57,11 @@ void TransactionManager::Commit(Transaction *txn) {
 
   if (enable_logging) {
     // TODO(student): add logging here
+    LogRecord log_record(txn->GetTransactionId(), txn->GetPrevLSN(), LogRecordType::COMMIT);
+    lsn_t cur_lsn = log_manager_->AppendLogRecord(&log_record);
+    txn->SetPrevLSN(cur_lsn);
+    while (cur_lsn > log_manager_->GetPersistentLSN())
+      log_manager_->WaitForFlushFinish();
   }
 
   // Release all the locks.
@@ -85,6 +92,11 @@ void TransactionManager::Abort(Transaction *txn) {
 
   if (enable_logging) {
     // TODO(student): add logging here
+    LogRecord log_record(txn->GetTransactionId(), txn->GetPrevLSN(), LogRecordType::ABORT);
+    lsn_t cur_lsn = log_manager_->AppendLogRecord(&log_record);
+    txn->SetPrevLSN(cur_lsn);
+    while (cur_lsn > log_manager_->GetPersistentLSN())
+      log_manager_->WaitForFlushFinish();
   }
 
   // Release all the locks.
