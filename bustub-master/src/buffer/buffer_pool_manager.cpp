@@ -94,7 +94,7 @@ Page *BufferPoolManager::FetchPageImpl(page_id_t page_id) {
 
 bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
     std::lock_guard<std::mutex> lock(latch_);
-
+        
     frame_id_t frame_id = page_table_[page_id];
     if (pages_[frame_id].pin_count_ <= 0)
         return false;
@@ -104,6 +104,7 @@ bool BufferPoolManager::UnpinPageImpl(page_id_t page_id, bool is_dirty) {
 
     // 如果pin count为0,将该frame放到replacer
     if (pages_[frame_id].pin_count_ == 0) {
+        // std::cout << "replacer Unpin: " << frame_id << std::endl;
         replacer_->Unpin(frame_id);
     }
     return true;
@@ -206,7 +207,7 @@ void BufferPoolManager::FlushAllPagesImpl() {
   for (const auto &e : page_table_) {
       if (pages_[e.second].is_dirty_) {
           lsn_t page_lsn = pages_[e.second].GetLSN();
-          while (page_lsn < log_manager_->GetPersistentLSN())
+          while (page_lsn > log_manager_->GetPersistentLSN())
             log_manager_->ForceFlush();
 
           disk_manager_->WritePage(e.first, pages_[e.second].data_);

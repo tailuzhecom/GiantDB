@@ -63,7 +63,6 @@ void LogManager::WaitForFlushFinish() {
 void LogManager::ForceFlush() {
     std::unique_lock<std::mutex> lck(latch_);
     cv_.notify_one();
-
     std::shared_future<void> fut = flush_future_;
     if (fut.valid())
         fut.wait();

@@ -206,7 +206,7 @@ TEST(RecoveryTest, UndoTest) {
 }
 
 // NOLINTNEXTLINE
-TEST(RecoveryTest, DISABLED_CheckpointTest) {
+TEST(RecoveryTest, CheckpointTest) {
   remove("test.db");
   remove("test.log");
   BustubInstance *bustub_instance = new BustubInstance("test.db");
@@ -219,10 +219,14 @@ TEST(RecoveryTest, DISABLED_CheckpointTest) {
   LOG_INFO("System logging thread running...");
 
   LOG_INFO("Create a test table");
+  std::cout << "transaction1 begin..." << std::endl;
   Transaction *txn = bustub_instance->transaction_manager_->Begin();
+  std::cout << "new TableHeap" << std::endl;
   auto *test_table = new TableHeap(bustub_instance->buffer_pool_manager_, bustub_instance->lock_manager_,
                                    bustub_instance->log_manager_, txn);
+  std::cout << "transaction1 commit..." << std::endl;                                  
   bustub_instance->transaction_manager_->Commit(txn);
+  std::cout << "transaction1 commit finish" << std::endl;  
 
   Column col1{"a", TypeId::VARCHAR, 20};
   Column col2{"b", TypeId::SMALLINT};
@@ -237,16 +241,22 @@ TEST(RecoveryTest, DISABLED_CheckpointTest) {
   log_timeout = std::chrono::seconds(15);
 
   // insert a ton of tuples
+  std::cout << "transaction2 begin..." << std::endl;
   Transaction *txn1 = bustub_instance->transaction_manager_->Begin();
-  for (int i = 0; i < 1000; i++) {
+  for (int i = 0; i < 100; i++) {
     RID rid;
     EXPECT_TRUE(test_table->InsertTuple(tuple, &rid, txn1));
   }
+  std::cout << "transaction2 commit..." << std::endl; 
   bustub_instance->transaction_manager_->Commit(txn1);
+  std::cout << "transaction2 commit finish" << std::endl;  
 
   // Do checkpoint
+  std::cout << "do checkpoint" << std::endl;
   bustub_instance->checkpoint_manager_->BeginCheckpoint();
+  std::cout << "BeginCheckpoint finish" << std::endl;
   bustub_instance->checkpoint_manager_->EndCheckpoint();
+  std::cout << "EndCheckpoint finish" << std::endl;
 
   Page *pages = bustub_instance->buffer_pool_manager_->GetPages();
   size_t pool_size = bustub_instance->buffer_pool_manager_->GetPoolSize();
