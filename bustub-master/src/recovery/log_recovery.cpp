@@ -184,13 +184,13 @@ void LogRecovery::Undo() {
     
     // 遍历未结束的事务，执行undo操作
     for (auto &e : active_txn_) {
-        offset_= e.second;
-
+        int read_offset = lsn_mapping_[e.second];
+        offset_ = 0;
         LogRecord log_record;
-        while (disk_manager_->ReadLog(log_buffer_, LOG_BUFFER_SIZE, offset_)) {
-            
-            assert(DeserializeLogRecord(log_buffer_, &log_record));
-
+        while (disk_manager_->ReadLog(log_buffer_, LOG_BUFFER_SIZE, read_offset)) {
+            std::cout << "execute undo: " << read_offset << std::endl;
+            assert(DeserializeLogRecord(log_buffer_, &log_record)); 
+            std::cout << log_record.ToString() << std::endl;
             if (log_record.log_record_type_ == LogRecordType::INSERT) {
                 page_id_t page_id = log_record.insert_rid_.GetPageId();
                 TablePage* page = (TablePage*)buffer_pool_manager_->FetchPage(page_id);
@@ -235,7 +235,7 @@ void LogRecovery::Undo() {
             if (lsn_mapping_.count(log_record.prev_lsn_) == 0)
                 break;
                 
-            offset_ = lsn_mapping_[log_record.prev_lsn_];
+            read_offset = lsn_mapping_[log_record.prev_lsn_];
         }
     }
 
